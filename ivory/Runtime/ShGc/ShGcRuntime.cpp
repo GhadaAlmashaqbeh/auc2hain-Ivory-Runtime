@@ -310,6 +310,36 @@ namespace osuCrypto
 		}
 	}
 
+	std::vector<std::pair<block>> generateLabels() {
+		// return these two labels
+		// threshold value garbled only send this across the socket
+		std::vector<block> garbler_inputs_labels;
+		// potential bid labels garbled
+		std::vector<std::pair<block>> evaluator_labels;
+		u64 label_i;
+		while (mInputQueue.size())
+		{
+			auto &item = mInputQueue.front();
+			mAes.ecbEncCounterMode(mInputIdx, item.mLabels->size(), item.mLabels->data());
+			mInputIdx += item.mLabels->size();
+
+			if (item.mInputVal.size())
+			{
+				for (u64 i = 0; i < item.mLabels->size(); ++i)
+				{
+					view[i] = (*item.mLabels)[i] ^ mZeroAndGlobalOffset[item.mInputVal[i]];
+				}
+				mChannel->asyncSend(std::move(view));
+			} else {
+			for (u64 i = 0; i < item.mLabels->size(); ++i)
+				{
+					evaluator_labels[label_i][0] = (*item.mLabels)[i];
+					evaluator_labels[label_i][1] = (*item.mLabels)[i] ^ mGlobalOffset;
+					label_i++;
+				}
+			}
+		}
+	}
 
 	void ShGcRuntime::garblerInput()
 	{
