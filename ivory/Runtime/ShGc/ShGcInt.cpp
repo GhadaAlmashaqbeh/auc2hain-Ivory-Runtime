@@ -40,7 +40,7 @@ namespace osuCrypto
 
     sIntBasePtr ShGcInt::copy(u64 beginIdx, u64 endIdx, i64 leftShift)
     {
-        endIdx = std::min(endIdx, mLabels->size());
+        endIdx = std::min<u64>(endIdx, mLabels->size());
         auto size = endIdx - beginIdx;
 
         auto ret(new ShGcInt(mRt, size));
@@ -449,6 +449,21 @@ namespace osuCrypto
         ValueType v= 0;
         memcpy(&v, bv.data(), bv.sizeBytes());
         return v;
+    }
+
+    // UPDATE HEADER FILE
+    return_type_TBD ShGcInt::getGarble() 
+    {
+        auto labels_and_circuit = mRt.processesQueueGarble();
+        return labels_and_circuit;
+
+    }
+
+    // UPDATE HEADER FILE
+    return_type_TBD ShGcInt::getEvaluation(type_TBD labels, type_TBD circuit) 
+    {
+        auto bid_result = mRt.processesQueueEvaluate(type_TBD labels, type_TBD circuit);
+        return bid_result;
     }
 
     ShGc::GarbledMem ShGcInt::getMemory(sIntBasePtr & a)

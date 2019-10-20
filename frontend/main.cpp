@@ -16,7 +16,7 @@
 
 using namespace osuCrypto;
 
-i32 program(std::array<Party, 2> parties, i64 myInput)
+i32 program1(std::array<Party, 2> parties, i64 myInput)
 {
 	// choose how large the arithmetic should be.
 	u64 bitCount = 16;
@@ -35,6 +35,134 @@ i32 program(std::array<Party, 2> parties, i64 myInput)
 	auto input1 = parties[1].isLocalParty() ?
 		parties[1].input<sInt>(myInput, bitCount) :
 		parties[1].input<sInt>(bitCount);
+
+	// perform some computation
+	auto add = input1 + input0;
+	auto sub = input1 - input0;
+	auto mul = input1 * input0;
+	auto div = input1 / input0;
+    
+    // multiplies input 1 by 2^4
+    auto shift = input1 << 4;
+
+    // logical operations
+	auto gteq = input1 >= input0;
+	auto lt = input1 < input0;
+
+    // select a subset of the bits
+    auto signBit = input1.copyBits(bitCount - 1, bitCount);
+
+    // perform if statements
+	auto max = gteq.ifelse(input1, input0);
+
+    // assigments
+	input0 = input1;
+
+
+	// reveal this output to party 0.
+	parties[0].reveal(add);
+	parties[0].reveal(sub);
+	parties[0].reveal(mul);
+    parties[0].reveal(div);
+    parties[0].reveal(signBit);
+	parties[0].reveal(gteq);
+	parties[0].reveal(lt);
+	parties[0].reveal(max);
+
+
+	if (parties[0].isLocalParty())
+	{
+		std::cout << "add       " << add.getValue() << std::endl;
+		std::cout << "sub       " << sub.getValue() << std::endl;
+		std::cout << "mul       " << mul.getValue() << std::endl;
+        std::cout << "div       " << div.getValue() << std::endl;
+        std::cout << "sign(in1) " << signBit.getValue() << std::endl;
+		std::cout << "gteq      " << gteq.getValue() << std::endl;
+		std::cout << "lt        " << lt.getValue() << std::endl;
+		std::cout << "max       " << max.getValue() << std::endl;
+	}
+
+	// operations can get queued up in the background. Eventually this call should not
+	// be required but in the mean time, if one party does not call getValue(), then
+	// processesQueue() should be called.
+	parties[1].getRuntime().processesQueue();
+
+
+	return 0;
+}
+
+i32 program2(i64 p1Input, i64 p2Input)
+{
+	// choose how large the arithmetic should be.
+	u64 bitCount = 16;
+
+	bool debug = false;
+
+	std::string ip = "127.0.0.1:1212";
+	
+	// IOSerive will perform the networking operations in the background
+	IOService ios;
+
+	// Session represents one end of a connection. It facilitates the
+	// creation of sockets that all bind to this port. First we pass it the 
+	// IOSerive and then the server's IP:port number. Next we state that 
+	// this Session should act as a server (listens to the provided port).
+	Session ep1(ios, ip, SessionMode::Server);
+
+	// We can now create a socket. This is done with addChannel. This operation 
+	// is asynchronous. If additional connections are needed between the 
+	// two parties, call addChannel again.
+	Channel chl1 = ep1.addChannel();
+
+	// this is an optional call that blocks until the socket has successfully 
+	// been set up.
+	chl1.waitForConnection();
+
+	// We will need a random number generator. Should pass it a real seed.
+	PRNG prng(ZeroBlock);
+
+	// In this example, we will use the semi-honest Garbled Circuit
+	// runtime. Once constructed, init should be called. We need to
+	// provide the runtime the channel that it will use to communicate 
+	// with the other party, a seed, what mode it should run in, and 
+	// the local party index. 
+	ShGcRuntime rt1;
+	rt1.mDebugFlag = debug;
+	rt1.init(ch1, prng.get<block>(), ShGcRuntime::Garbler, 1);
+
+	// garbler's (seller's) input (threshold value)
+	auto input0 = rt1.sIntInput(p1Input, bitCount);
+
+
+	PRNG2 prng(OneBlock);
+	// IOSerive will perform the networking operations in the background
+	IOService ios;
+
+	// set up networking. See above for details
+	Session ep0(ios, ip, SessionMode::Client);
+	Channel chl0 = ep0.addChannel();
+
+	// set up the runtime, see above for details
+	ShGcRuntime rt0;
+	rt0.mDebugFlag = debug;
+	rt0.init(chl0, prng.get<block>(), ShGcRuntime::Evaluator, 0);
+
+
+	auto labels_and_circuit = input0.getGarble();
+
+	//auc2hain stuff, which ivoryRuntime doesn't need to care about
+
+	// simulate auc2chain selecting correct labels
+	for bit in p2Input 
+		select relevant n labels
+
+	auto gteq = input1 >= input0;
+	
+	// Where labels is size 2n
+	auto result = rt0.processesQueueEvaluation(labels, circuit)
+
+
+
 
 	// perform some computation
 	auto add = input1 + input0;

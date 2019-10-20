@@ -297,12 +297,13 @@ namespace osuCrypto
 		{
 			if (mRole == Garbler)
 			{
-				garblerInput();
+				auto out = generateLabels();
 				garblerCircuit();
 				garblerOutput();
 			}
 			else
 			{
+				std::cout << "pre-eval" << std::endl;
 				evaluatorInput();
 				evaluatorCircuit();
 				evaluatorOutput();
@@ -310,6 +311,149 @@ namespace osuCrypto
 		}
 	}
 
+	// UPDATE HEADER FILE
+	void ShGcRuntime::processesQueueGarble()
+	{
+
+		// TODO: add logic to decide when to process the queue
+		// and when to simply queue things up. For now,
+		// always keep the queue at size 1 or less.
+		auto labels = garbleInput();
+		auto circuit = garblerCircuit();
+		return std::array<type_tbd, 2>(lables, circuits);
+	}
+
+	// UPDATE HEADER FILE
+	void ShGcRuntime::processesQueueEvaluation(type_TBD labels, type_TBD circuit)
+	{
+
+		// TODO: add logic to decide when to process the queue
+		// and when to simply queue things up. For now,
+		// always keep the queue at size 1 or less.
+		evaluatorInput(); // potenitally skip
+		evaluatorCircuit();
+		// what does evaluator output? we need the item.mOutputProm value (line 695)
+		auto return_val = evaluatorOutput();
+		return return_val;
+	}
+
+	std::vector<std::vector<std::pair<block, block>>> ShGcRuntime::generateLabels() 
+	{
+		std::vector<std::array<block, 2>> messages(mOtCount);
+		if (mOtCount)
+		{
+
+			mOtCount = 0;
+
+			mOtExtSender.send(messages, mPrng, *mChannel);
+
+
+		}
+
+		auto iter = messages.begin();
+
+		// return these two labels
+		// potential bid labels garbled
+		std::vector<std::vector<std::pair<block, block>>> evaluator_labels;
+		// std::vector<std::pair<block, block>> evaluator_labels;
+		std::cout << "begin" << std::endl;
+		int in_size = mInputQueue.size();
+		int count1 = 0;
+		int count2 = 0;
+		while (mInputQueue.size())
+		{
+			auto &item = mInputQueue.front();
+			mAes.ecbEncCounterMode(mInputIdx, item.mLabels->size(), item.mLabels->data());
+			mInputIdx += item.mLabels->size();
+
+			// threshold value garbled only send this across the socket
+			std::vector<block> garbler_input_labels(item.mLabels->size());
+
+			if (item.mInputVal.size())
+			{
+				std::cout << "begin garble" << std::endl;
+				for (u64 i = 0; i < item.mLabels->size(); ++i)
+				{
+					garbler_input_labels[i] = (*item.mLabels)[i] ^ mZeroAndGlobalOffset[item.mInputVal[i]];
+					count1++;
+				}
+				std::vector<std::pair<block, block>> eval_labels(item.mLabels->size());
+				std::cout << "eval begin" << std::endl;
+				for (u64 i = 0; i < item.mLabels->size(); ++i)
+				{
+					eval_labels[i].first = (*item.mLabels)[i];
+					eval_labels[i].second = (*item.mLabels)[i] ^ mGlobalOffset;
+				}
+				std::cout << "eval labels size: " << eval_labels.size() << std::endl;
+				std::cout << "eval end" << std::endl;
+				evaluator_labels.push_back(eval_labels);
+				std::cout << "end garble" << std::endl;
+				// mChannel->asyncSend(std::move(garbler_input_labels));
+			} 
+			else {
+				std::vector<block>view(item.mLabels->size());
+				for (u64 i = 0; i < item.mLabels->size(); ++i, ++iter)
+				{
+					(*item.mLabels)[i] = (*iter)[0];
+					view[i] = (*iter)[1] ^ (*iter)[0] ^ mGlobalOffset;
+					count1++;
+				}
+				// mChannel->asyncSend(std::move(view));
+
+
+				std::vector<std::pair<block, block>> eval_labels(item.mLabels->size());
+				std::cout << "eval begin" << std::endl;
+				for (u64 i = 0; i < item.mLabels->size(); ++i)
+				{
+					eval_labels[i].first = (*item.mLabels)[i];
+					eval_labels[i].second = (*item.mLabels)[i] ^ mGlobalOffset;
+				}
+				std::cout << "eval labels size: " << eval_labels.size() << std::endl;
+				std::cout << "eval end" << std::endl;
+				evaluator_labels.push_back(eval_labels);
+				std::cout << "evaluator labels contents" << std::endl;
+				for (int i = 0; i <evaluator_labels.size(); i++) {
+					for (int j = 0; j < evaluator_labels[i].size(); j++) {
+						std::cout << evaluator_labels[i][j].first << std::endl;
+					}
+				}
+				std::cout << "evaluator labels size: " << evaluator_labels[0].size() << std::endl;
+
+			}
+			mInputQueue.pop();
+		}
+
+		std::vector<std::vector<block>> labels;
+		
+		for (int j = 0; j < in_size; j++) {
+			std::vector<int> bid(evaluator_labels[j].size(), 0);
+			std::cout << "eval labels size: " << evaluator_labels[j].size() << std::endl;
+			std::cout << "bid: " << bid.size() << std::endl;
+			std::vector<block> individual_labels;
+			for (int i = 0; i <bid.size(); i++) {
+				if (bid[i] == 0) {
+					individual_labels.push_back(evaluator_labels[j][i].first);
+					count2++;
+				}
+				else {
+					individual_labels.push_back(evaluator_labels[j][i].second);
+					count2++;
+				}
+			}
+			labels.push_back(individual_labels);
+		}
+		std::cout << "count 1: ";
+		std::cout << count1 << std::endl;
+		std::cout << "count 2: ";
+		std::cout << count2 << std::endl;
+		for (int i = 0; i < labels.size(); i++) {
+			mChannel->asyncSend(std::move(labels[i]));
+		}
+		
+
+		std::cout << "end func" << std::endl;
+		return evaluator_labels;
+	}
 
 	void ShGcRuntime::garblerInput()
 	{
