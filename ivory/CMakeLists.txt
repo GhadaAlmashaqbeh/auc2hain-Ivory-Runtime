@@ -104,18 +104,21 @@ set(NTL_LIB "${NTL_Lib_Dirs}libntl.a")
 
 if(NOT EXISTS "${NTL_LIB}")
   # we failed to find it, try using find_library
+  unset(NTL_LIB)
   find_library(
     NTL_LIB 
     NAMES ntl  
     HINTS NTL_Lib_Dirs)
   
-  # if we still cant fint it, throw an error
+  # if we still cant find it, throw an error
   if(NOT NTL_LIB)
-    Message(${NTL_LIB})
     message(FATAL_ERROR "Failed to find NTL at ${NTL_Lib_Dirs} or at system locations." )
+  else()
+    message("-- Found NTL: ${NTL_LIB}")
   endif()
 else()
   target_include_directories(ivory PUBLIC ${NTL_Include_Dirs})
+  message("-- Found NTL: ${NTL_LIB}")
   #message(" ----  NTL -----  ${NTL_Include_Dirs}")
 endif()
 
