@@ -1,4 +1,19 @@
-# The Ivory Secure Computation Runtime
+# The Ivory Secure Comptutation Runtime for Auc2hain
+
+This repository can only be used as a submodule of the Auc2hain repo.
+
+https://github.com/GhadaAlmashaqbeh/auc2hain
+
+Note: it is not mandatory to compile NTL using:
+```
+cd Ivory-Runtime/thirdparty/linux
+bash ./ntl.get
+```
+if NTL is installed in a standard location.
+
+See commit 995f41ea38f9d159bc68732e25c2ffae4b74e8cd
+
+# ORIGINAL OUTDATED DOCUMENTATION - The Ivory Secure Computation Runtime
 
 
 
