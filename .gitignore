@@ -200,3 +200,6 @@ kProbe_data_*
 CodeDB
 LinuxFrontEnd/VisualGDBCache
 /unitTest.txt
+
+# CLion
+.idea
