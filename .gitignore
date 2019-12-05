@@ -198,3 +198,7 @@ kProbe_data_*
 CodeDB
 LinuxFrontEnd/VisualGDBCache
 /unitTest.txt
+
+/cmake-build-*
+.idea
+/lib
