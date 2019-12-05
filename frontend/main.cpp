@@ -63,7 +63,8 @@ i32 program(std::array<Party, 2> parties, i64 myInput)
 	input0 = input1;
 
 
-	// reveal this output to party 0.
+	// reveal this output to party 1.
+	// OFFLINE VERSION only supports to reveal to party 1
 	parties[1].reveal(add);
 	parties[1].reveal(sub);
 	parties[1].reveal(mul);
