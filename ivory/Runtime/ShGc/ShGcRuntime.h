@@ -50,7 +50,7 @@ namespace osuCrypto
         sInt sIntInput(sInt::ValueType v, BitCount bc) override;
 
 
-
+        std::vector<std::array<block,2>> evaluatorLabels;
 
         u64 getPartyIdx() override { return mPartyIdx; }
 
@@ -101,6 +101,11 @@ namespace osuCrypto
         std::queue<ShGc::CircuitItem> mCrtQueue;
         std::queue<ShGc::InputItem> mInputQueue;
         std::queue<ShGc::OutputItem> mOutputQueue;
+
+        // mEvaluatorInputLabels is populated with the input labels for the evaluator
+        std::vector<std::array<block, 2>> mEvaluatorInputLabels;
+        // mEvaluatorInputLabelIdx is the current index read from mEvaluatorInputLabels
+        u64 mEvaluatorInputLabelIdx;
 
         static bool isConstLabel(const block& b);
 

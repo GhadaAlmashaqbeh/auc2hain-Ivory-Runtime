@@ -6,7 +6,7 @@
 #############################################
 
 file(GLOB_RECURSE SRCS *.cpp)
-add_library(ivory ${SRCS})
+add_library(ivory ${SRCS} OfflineSocket.h)
 target_include_directories(ivory PUBLIC ${CMAKE_SOURCE_DIR}/ivory)
 
 

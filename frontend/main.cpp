@@ -13,8 +13,12 @@
 #include <string>
 #include "cryptoTools/Crypto/PRNG.h"
 #include "cryptoTools/Common/CLP.h"
+#include "OfflineSocket.h"
 
 using namespace osuCrypto;
+
+i64 inputParty0 = 23;
+i64 inputParty1 = 44;
 
 i32 program(std::array<Party, 2> parties, i64 myInput)
 {
@@ -60,38 +64,45 @@ i32 program(std::array<Party, 2> parties, i64 myInput)
 
 
 	// reveal this output to party 0.
-	parties[0].reveal(add);
-	parties[0].reveal(sub);
-	parties[0].reveal(mul);
-    parties[0].reveal(div);
-    parties[0].reveal(signBit);
-	parties[0].reveal(gteq);
-	parties[0].reveal(lt);
-	parties[0].reveal(max);
+	parties[1].reveal(add);
+	parties[1].reveal(sub);
+	parties[1].reveal(mul);
+    parties[1].reveal(div);
+    parties[1].reveal(signBit);
+	parties[1].reveal(gteq);
+	parties[1].reveal(lt);
+	parties[1].reveal(max);
 
 
-	if (parties[0].isLocalParty())
+	if (parties[1].isLocalParty())
 	{
-		std::cout << "add       " << add.getValue() << std::endl;
-		std::cout << "sub       " << sub.getValue() << std::endl;
-		std::cout << "mul       " << mul.getValue() << std::endl;
-        std::cout << "div       " << div.getValue() << std::endl;
-        std::cout << "sign(in1) " << signBit.getValue() << std::endl;
-		std::cout << "gteq      " << gteq.getValue() << std::endl;
-		std::cout << "lt        " << lt.getValue() << std::endl;
-		std::cout << "max       " << max.getValue() << std::endl;
+		std::cout << "add       " << std::left << std::setw(6) << add.getValue() \
+			<< "(expected: " << (inputParty1 + inputParty0) << ")" << std::endl;
+		std::cout << "sub       " << std::left << std::setw(6) << sub.getValue() \
+			<< "(expected: " << (inputParty1 - inputParty0) << ")" << std::endl;
+		std::cout << "mul       " << std::left << std::setw(6) << mul.getValue() \
+		    << "(expected: " << (inputParty1 * inputParty0) << ")" << std::endl;
+        std::cout << "div       " << std::left << std::setw(6) << div.getValue() \
+            << "(expected: " << (inputParty1 / inputParty0) << ")" << std::endl;
+        std::cout << "sign(in1) " << std::left << std::setw(6) << signBit.getValue() << std::endl;
+		std::cout << "gteq      " << std::left << std::setw(6) << gteq.getValue() \
+            << "(expected: " << (inputParty1 >= inputParty0) << ")" << std::endl;
+		std::cout << "lt        " << std::left << std::setw(6) << lt.getValue() << std::endl;
+		std::cout << "max       " << std::left << std::setw(6) << max.getValue() \
+            << "(expected: " << std::max(inputParty0, inputParty1) << ")" << std::endl;
 	}
 
 	// operations can get queued up in the background. Eventually this call should not
 	// be required but in the mean time, if one party does not call getValue(), then
 	// processesQueue() should be called.
-	parties[1].getRuntime().processesQueue();
+	parties[0].getRuntime().processesQueue();
 
 
 	return 0;
 }
 
-void party1(std::string ip)
+// Lots of copies for nothing (buffer)
+void party1(std::vector<u8> buffer, std::vector<std::array<block, 2>> evaluatorInputLabels)
 {
 
 
@@ -105,16 +116,19 @@ void party1(std::string ip)
 	// creation of sockets that all bind to this port. First we pass it the 
 	// IOSerive and then the server's IP:port number. Next we state that 
 	// this Session should act as a server (listens to the provided port).
-	Session ep1(ios, ip, SessionMode::Server);
+	//Session ep1(ios, ip, SessionMode::Server);
 
 	// We can now create a socket. This is done with addChannel. This operation 
 	// is asynchronous. If additional connections are needed between the 
 	// two parties, call addChannel again.
-	Channel chl1 = ep1.addChannel();
+	//Channel chl1 = ep1.addChannel();
 
 	// this is an optional call that blocks until the socket has successfully 
 	// been set up.
-	chl1.waitForConnection();
+	//chl1.waitForConnection();
+
+    OfflineSocketRecvOnly socket(buffer);
+    Channel chl1(ios, new SocketAdapter<OfflineSocketRecvOnly>(socket));
 
 	// We will need a random number generator. Should pass it a real seed.
 	PRNG prng(ZeroBlock);
@@ -127,6 +141,7 @@ void party1(std::string ip)
 	ShGcRuntime rt1;
 	rt1.mDebugFlag = debug;
 	rt1.init(chl1, prng.get<block>(), ShGcRuntime::Evaluator, 1);
+	rt1.mEvaluatorInputLabels = evaluatorInputLabels;
 
 	// We can then instantiate the parties that will be running the protocol.
 	std::array<Party, 2> parties{
@@ -139,11 +154,13 @@ void party1(std::string ip)
 	{
 		// the prgram take the parties that are participating and the input
 		// of the local party, in this case its 44.
-		program(parties, 44);
+		program(parties, inputParty1);
 	}
+
 }
 
-void party0(std::string ip)
+// Returns a pair (garbled gates, evaluator labels)
+std::pair<std::vector<u8>, std::vector<std::array<block,2>>> party0()
 {
 
 	u64 tries(2);
@@ -153,9 +170,13 @@ void party0(std::string ip)
 	// IOSerive will perform the networking operations in the background
 	IOService ios;
 
+	// OFFLINE VERSION
 	// set up networking. See above for details
-	Session ep0(ios, ip, SessionMode::Client);
-	Channel chl0 = ep0.addChannel();
+	//Session ep0(ios, ip, SessionMode::Client);
+	//Channel chl0 = ep0.addChannel();
+	std::vector<u8> buffer;
+	OfflineSocketSendOnly socket(buffer);
+	Channel chl0(ios, new SocketAdapter<OfflineSocketSendOnly>(socket));
 
 	// set up the runtime, see above for details
 	ShGcRuntime rt0;
@@ -171,8 +192,12 @@ void party0(std::string ip)
 	// run the program serveral time, with time with 23 as the input value
 	for (u64 i = 0; i < tries; ++i)
 	{
-		program(parties, 23);
+		program(parties, inputParty0);
 	}
+
+    chl0.close();
+
+    return std::make_pair(buffer, rt0.mEvaluatorInputLabels);
 }
 
 int main(int argc, char**argv)
@@ -181,36 +206,39 @@ int main(int argc, char**argv)
 	// parse command line options
 	CLP cmd(argc, argv);
 
+	// OFFLINE VERSION
 	if (cmd.isSet("r"))
 	{
-		// this is the control flow in the event that we want to run the protocol between two programs.
-
-		auto r = cmd.getOr("r", -1);
-		auto ip = cmd.getOr("ip", std::string{ "127.0.0.1:1212" });
-
-		if (r == 0)
-		{
-			party0(ip);
-		}
-		else if (r == 1)
-		{
-			party1(ip);
-		}
-		else
-		{
-			std::cout << "the -r flag needs to have a value of 0 or 1" << std::endl;
-		}
+//		// this is the control flow in the event that we want to run the protocol between two programs.
+//
+//		auto r = cmd.getOr("r", -1);
+//		auto ip = cmd.getOr("ip", std::string{ "127.0.0.1:1212" });
+//
+//		if (r == 0)
+//		{
+//			party0(ip);
+//		}
+//		else if (r == 1)
+//		{
+//			party1(ip);
+//		}
+//		else
+//		{
+//			std::cout << "the -r flag needs to have a value of 0 or 1" << std::endl;
+//		}
 	}
 	else
 	{
-		// here we run both parties in a single program.
+//		// here we run both parties in a single program.
+//
+//		// We need a second thread to run the other party.
+//		std::thread thrd(party0, "127.0.0.1:1212");
+//		party1("127.0.0.1:1212");
+//
+//		//thrd.join();
 
-		// We need a second thread to run the other party.
-		std::thread thrd(party0, "127.0.0.1:1212");
-
-		party1("127.0.0.1:1212");
-
-		thrd.join();
+        auto [buffer, evaluatorInputLabels] = party0();
+        party1(buffer, evaluatorInputLabels);
 	}
 	return 0;
 }

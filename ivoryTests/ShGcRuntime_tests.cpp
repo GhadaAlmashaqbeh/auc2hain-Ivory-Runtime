@@ -11,6 +11,8 @@
 
 using namespace osuCrypto;
 
+// WARNING: OFFLINE VERSION modifications will most likely make these tests fail!
+// Use frontend for testing (not ideal - TODO)
 
 
 void ShGcRuntime_publicGateGarble_Test()

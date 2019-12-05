@@ -22,6 +22,7 @@ namespace osuCrypto
 
 		mOtCount = 0;
 		mBytesSent = 0;
+        mEvaluatorInputLabelIdx = 0;
 	}
 
 
@@ -42,22 +43,22 @@ namespace osuCrypto
 		mRole = role;
 		mPartyIdx = partyIdx;
 
-
-		if (role == Garbler)
-		{
-			DefaultBaseOT base;
-			BitVector choices(128);
-			std::vector<block> msg(128);
-			base.receive(choices, msg, mPrng, chl);
-			mOtExtSender.setBaseOts(msg, choices);
-		}
-		else
-		{
-            DefaultBaseOT base;
-			std::vector<std::array<block, 2>> msg(128);
-			base.send(msg, mPrng, chl);
-			mOtExtRecver.setBaseOts(msg);
-		}
+        // OFFLINE VERSION
+//		if (role == Garbler)
+//		{
+//			DefaultBaseOT base;
+//			BitVector choices(128);
+//			std::vector<block> msg(128);
+//			base.receive(choices, msg, mPrng, chl);
+//			mOtExtSender.setBaseOts(msg, choices);
+//		}
+//		else
+//		{
+//            DefaultBaseOT base;
+//			std::vector<std::array<block, 2>> msg(128);
+//			base.send(msg, mPrng, chl);
+//			mOtExtRecver.setBaseOts(msg);
+//		}
 
 	}
 
@@ -313,18 +314,20 @@ namespace osuCrypto
 
 	void ShGcRuntime::garblerInput()
 	{
-		std::vector<std::array<block, 2>> messages(mOtCount);
+        std::vector<block> evaluatorLabels0(mOtCount);
+        //std::vector<std::array<block, 2>> messages(mOtCount);
 		if (mOtCount)
 		{
-
 			mOtCount = 0;
-
-			mOtExtSender.send(messages, mPrng, *mChannel);
-
-
+            // OFFLINE VERSION
+//			mOtExtSender.send(messages, mPrng, *mChannel);
+            mAes.ecbEncCounterMode(mInputIdx, evaluatorLabels0.size(), evaluatorLabels0.data());
+            mInputIdx += evaluatorLabels0.size();
 		}
+        // OFFLINE VERSION
+		//auto iter = messages.begin();
+        auto iter2 = evaluatorLabels0.begin();
 
-		auto iter = messages.begin();
 
 		while (mInputQueue.size())
 		{
@@ -347,13 +350,20 @@ namespace osuCrypto
 			}
 			else
 			{
-				std::vector<block>view(item.mLabels->size());
-				for (u64 i = 0; i < item.mLabels->size(); ++i, ++iter)
+                //std::vector<block>view(item.mLabels->size());
+                // OFFLINE VERSION
+                mEvaluatorInputLabels.resize(mEvaluatorInputLabels.size() + item.mLabels->size());
+				for (u64 i = 0; i < item.mLabels->size(); ++i, /* ++iter, */++iter2, ++mEvaluatorInputLabelIdx)
 				{
-					(*item.mLabels)[i] = (*iter)[0];
-					view[i] = (*iter)[1] ^ (*iter)[0] ^ mGlobalOffset;
+                    // OFFLINE VERSION
+					//(*item.mLabels)[i] = (*iter)[0];
+					// view[i] = (*iter)[1] ^ (*iter)[0] ^ mGlobalOffset;
+                    mEvaluatorInputLabels[mEvaluatorInputLabelIdx][0] = *iter2;
+                    (*item.mLabels)[i] = mEvaluatorInputLabels[mEvaluatorInputLabelIdx][0];
+                    mEvaluatorInputLabels[mEvaluatorInputLabelIdx][1] = mEvaluatorInputLabels[mEvaluatorInputLabelIdx][0] ^ mGlobalOffset;
 				}
-				mChannel->asyncSend(std::move(view));
+				// OFFLINE VERSION
+				//mChannel->asyncSend(std::move(view));
 			}
 
 			mInputQueue.pop();
@@ -367,20 +377,20 @@ namespace osuCrypto
 		if (mOtChoices.size())
 		{
 
-			if (sharedMem.size() < mOtCount)
-				sharedMem.resize(mOtCount);
+            // OFFLINE VERSION
+//			if (sharedMem.size() < mOtCount)
+//				sharedMem.resize(mOtCount);
 
-			//sharedMem.resize(mOtCount);
-			span<block> view(sharedMem.begin(), sharedMem.begin() + mOtCount);
-
-			mOtExtRecver.receive(mOtChoices, sharedMem, mPrng, *mChannel);
-
+//			//sharedMem.resize(mOtCount);
+//			span<block> view(sharedMem.begin(), sharedMem.begin() + mOtCount);
+//
+//			mOtExtRecver.receive(mOtChoices, sharedMem, mPrng, *mChannel);
+//
 			mOtChoices.resize(0);
 			mOtCount = 0;
-
 		}
 
-		auto iter = sharedMem.begin();
+//		auto iter = sharedMem.begin();
 
 		while (mInputQueue.size())
 		{
@@ -389,12 +399,18 @@ namespace osuCrypto
 
 			if (item.mInputVal.size())
 			{
-				mChannel->recv(sharedBuff);
+                // OFFLINE VERSION
+//				mChannel->recv(sharedBuff);
 
-				for (u64 i = 0; i < item.mLabels->size(); ++i)
+//				for (u64 i = 0; i < item.mLabels->size(); ++i)
+//				{
+//					(*item.mLabels)[i] = *iter++ ^ (zeroAndAllOnesBlk[item.mInputVal[i]] & sharedBuff[i]);
+//				}
+
+                for (u64 i = 0; i < item.mLabels->size(); ++i, ++mEvaluatorInputLabelIdx)
 				{
-					(*item.mLabels)[i] = *iter++ ^ (zeroAndAllOnesBlk[item.mInputVal[i]] & sharedBuff[i]);
-				}
+					(*item.mLabels)[i] = mEvaluatorInputLabels[mEvaluatorInputLabelIdx][item.mInputVal[i]];
+                }
 			}
 			else
 			{
@@ -566,7 +582,6 @@ namespace osuCrypto
 					//    std::cout << "eval " << i << " " << j << " " << (*item.mLabels[i])[j] << std::endl;
 				}
 				//std::cout << IoStream::unlock;
-
 				if (item.mCircuit->mNonlinearGateCount)
 				{
 					mChannel->recv(sharedBuff);
