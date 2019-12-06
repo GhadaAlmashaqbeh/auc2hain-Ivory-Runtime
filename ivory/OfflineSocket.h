@@ -44,10 +44,10 @@ public:
 class OfflineSocketRecvOnly {
 public:
     size_t mPos;
-    std::__1::vector<u8> mBuffer;
+    std::vector<u8> mBuffer;
 
     // TODO: lots of copies for nothing, we should improve on this
-    explicit OfflineSocketRecvOnly(std::__1::vector<u8> buffer) : mPos(0), mBuffer(buffer){}
+    explicit OfflineSocketRecvOnly(std::vector<u8> buffer) : mPos(0), mBuffer(buffer){}
 
     void send(const u8* data, u64 size) {
         throw new std::runtime_error("OfflineSocketSendOnly cannot receive data.");
