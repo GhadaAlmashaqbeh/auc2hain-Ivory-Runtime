@@ -541,8 +541,8 @@ namespace osuCrypto
         auto size = end - begin;
             
 
-        auto leftShift = std::max(item.mLeftShift, 0ll);
-        auto rightShift = -std::min(item.mLeftShift, 0ll);
+        auto leftShift = std::max<i64>(item.mLeftShift, 0ll);
+        auto rightShift = -std::min<i64>(item.mLeftShift, 0ll);
         begin += rightShift;
         end -= leftShift; 
 
